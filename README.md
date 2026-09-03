@@ -4,10 +4,11 @@
 
 ## 怎么用
 
-GitHub Actions 会在每天凌晨（UTC 04:00）自动下载 `filter_1.txt`、转换成 `filter_1.srs` 并提交回仓库。直接引用它：
+GitHub Actions 会在每天凌晨（UTC 04:00）自动下载并转换这两个列表，提交回仓库：
 
 ```text
 https://raw.githubusercontent.com/7bywrv52h5-del/Personal_Sing-box_and_Surge_Configs/main/filter_1.srs
+https://raw.githubusercontent.com/7bywrv52h5-del/Personal_Sing-box_and_Surge_Configs/main/filter_27.srs
 ```
 
 在 sing-box 配置里这样引用：
@@ -23,4 +24,4 @@ https://raw.githubusercontent.com/7bywrv52h5-del/Personal_Sing-box_and_Surge_Con
 
 ## 添加更多过滤列表
 
-编辑 [.github/workflows/update.yml](.github/workflows/update.yml)，把 `FILTER_URL` 换成别的列表，或按同样格式多复制一段 `Download and convert filter` 步骤即可。
+编辑 [.github/workflows/update.yml](.github/workflows/update.yml)，新增一个 `FILTER_xx_URL` 环境变量，并在 `Download and convert filters` 步骤里按同样格式加两行即可。

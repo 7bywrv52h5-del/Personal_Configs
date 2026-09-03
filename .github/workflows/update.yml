@@ -13,7 +13,8 @@ permissions:
 
 env:
   SING_BOX_VERSION: "1.14.0"
-  FILTER_URL: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt"
+  FILTER_1_URL: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt"
+  FILTER_27_URL: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_27.txt"
 
 jobs:
   update:
@@ -29,10 +30,12 @@ jobs:
           sudo install -m 0755 "/tmp/sing-box-${SING_BOX_VERSION}-linux-amd64/sing-box" /usr/local/bin/sing-box
           sing-box version
 
-      - name: Download and convert filter
+      - name: Download and convert filters
         run: |
-          curl -fL -o filter_1.txt "${FILTER_URL}"
+          curl -fL -o filter_1.txt "${FILTER_1_URL}"
           sing-box rule-set convert -t adguard filter_1.txt -o filter_1.srs
+          curl -fL -o filter_27.txt "${FILTER_27_URL}"
+          sing-box rule-set convert -t adguard filter_27.txt -o filter_27.srs
 
       - name: Commit and push
         run: |
