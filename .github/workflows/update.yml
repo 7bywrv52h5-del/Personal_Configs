@@ -1,0 +1,47 @@
+name: Update rule-sets
+
+on:
+  push:
+    paths:
+      - ".github/workflows/update.yml"
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  SING_BOX_VERSION: "1.14.0"
+  FILTER_URL: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sing-box
+        run: |
+          curl -fL -o /tmp/sing-box.tar.gz \
+            "https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz"
+          tar -xzf /tmp/sing-box.tar.gz -C /tmp
+          sudo install -m 0755 "/tmp/sing-box-${SING_BOX_VERSION}-linux-amd64/sing-box" /usr/local/bin/sing-box
+          sing-box version
+
+      - name: Download and convert filter
+        run: |
+          curl -fL -o filter_1.txt "${FILTER_URL}"
+          sing-box rule-set convert -t adguard filter_1.txt -o filter_1.srs
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.srs'
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "chore: update rule-sets ($(date -u +%Y-%m-%d))"
+            git push
+          fi
