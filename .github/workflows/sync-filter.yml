@@ -113,7 +113,7 @@ jobs:
           suffix, exact = set(), set()
           exc_suffix, exc_exact = set(), set()
 
-          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt', 'custom-rules.txt']:
+          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt', 'custom-rules.list']:
               s, e, es, ee = parse_adblock(path)
               suffix |= s
               exact |= e
