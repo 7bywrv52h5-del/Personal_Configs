@@ -2,8 +2,8 @@ name: Sync Surge Rules
 
 on:
   schedule:
-    # 每天 UTC 20:00（北京时间 04:00）自动同步，可按需修改
-    - cron: "0 20 * * *"
+    # 每天 UTC 21:00（北京时间 05:00）自动同步，可按需修改
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 permissions:
