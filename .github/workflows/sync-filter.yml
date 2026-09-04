@@ -1,0 +1,172 @@
+name: Sync Filter Rules
+
+on:
+  schedule:
+    # 每天 UTC 05:00（北京时间 13:00）自动同步，可按需修改
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: filter-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download upstream filter lists
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/adguard_dns.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+          curl -fsSL -o /tmp/adguard_popup.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/adguard_popup_filter.txt"
+          curl -fsSL -o /tmp/oisd_big.list "https://dl.oisd.nl/oisd_big_surge.list"
+
+      - name: Merge, dedupe and generate
+        run: |
+          python3 - <<'PY'
+          import json, re
+
+          def valid_domain(d):
+              if not d or len(d) > 253 or d.startswith('.') or d.endswith('.'):
+                  return False
+              if '*' in d or ' ' in d or '/' in d or '#' in d:
+                  return False
+              labels = d.split('.')
+              if len(labels) < 2:
+                  return False
+              return all(lab and len(lab) <= 63 and re.fullmatch(r"[a-z0-9_\-]+", lab) for lab in labels)
+
+          def clean(d):
+              d = d.strip().lower()
+              d = d.split('^', 1)[0].split('/', 1)[0].split('#', 1)[0]
+              return d.strip('.')
+
+          def parse_adblock(path):
+              suffix, exact = set(), set()
+              exc_suffix, exc_exact = set(), set()
+              with open(path, encoding='utf-8', errors='ignore') as f:
+                  for raw in f:
+                      s = raw.strip()
+                      if not s or s.startswith('!') or s.startswith('['):
+                          continue
+                      if s.startswith('/') and s.endswith('/'):
+                          continue
+                      is_exc = s.startswith('@@')
+                      if is_exc:
+                          s = s[2:]
+                      if '$' in s:
+                          s = s.split('$', 1)[0].strip()
+                      # hosts style: 0.0.0.0 domain / 127.0.0.1 domain / ::1 domain
+                      m = re.match(r"^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F:]+)\s+(\S+)", s)
+                      if m:
+                          d = clean(m.group(1))
+                          suffix_match = False
+                      else:
+                          if s.startswith('||'):
+                              d = clean(s[2:])
+                              suffix_match = True
+                          elif s.startswith('|'):
+                              d = clean(s[1:])
+                              suffix_match = False
+                          else:
+                              d = clean(s)
+                              suffix_match = False
+                      if not valid_domain(d):
+                          continue
+                      if is_exc:
+                          (exc_suffix if suffix_match else exc_exact).add(d)
+                      else:
+                          (suffix if suffix_match else exact).add(d)
+              return suffix, exact, exc_suffix, exc_exact
+
+          def parse_surge(path):
+              suffix, exact = set(), set()
+              with open(path, encoding='utf-8', errors='ignore') as f:
+                  for raw in f:
+                      s = raw.strip()
+                      if not s or s.startswith('#') or s.startswith('//'):
+                          continue
+                      if ',' in s:
+                          typ, val = s.split(',', 1)
+                          typ = typ.strip().upper()
+                          val = clean(val)
+                          if typ == 'DOMAIN-SUFFIX':
+                              if valid_domain(val):
+                                  suffix.add(val)
+                          elif typ == 'DOMAIN':
+                              if valid_domain(val):
+                                  exact.add(val)
+                      else:
+                          # 纯域名（每行一个），按后缀匹配处理
+                          d = clean(s)
+                          if valid_domain(d):
+                              suffix.add(d)
+              return suffix, exact
+
+          suffix, exact = set(), set()
+          exc_suffix, exc_exact = set(), set()
+
+          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt', 'custom-rules.txt']:
+              s, e, es, ee = parse_adblock(path)
+              suffix |= s
+              exact |= e
+              exc_suffix |= es
+              exc_exact |= ee
+
+          s, e = parse_surge('/tmp/oisd_big.list')
+          suffix |= s
+          exact |= e
+
+          # 应用白名单例外
+          suffix -= exc_suffix
+          exact -= exc_exact
+          # 后缀匹配已覆盖其自身及所有子域，去掉被后缀覆盖的精确项
+          exact -= suffix
+          # 去掉属于某个例外后缀子域的精确项
+          exact = {d for d in exact if not any(d == es or d.endswith('.' + es) for es in exc_suffix)}
+
+          # Surge DOMAIN-SET：'.' 前缀表示后缀匹配，无前缀表示精确匹配
+          lines = ['.' + d for d in sorted(suffix)] + [d for d in sorted(exact)]
+          with open('filter.list', 'w', encoding='utf-8') as f:
+              f.write('\n'.join(lines) + '\n')
+
+          # sing-box rule-set 源文件（JSON），随后编译为 .srs
+          rules = []
+          if exact:
+              rules.append({'domain': sorted(exact)})
+          if suffix:
+              rules.append({'domain_suffix': ['.' + d for d in sorted(suffix)]})
+          with open('/tmp/filter.json', 'w', encoding='utf-8') as f:
+              json.dump({'version': 2, 'rules': rules}, f, ensure_ascii=False, separators=(',', ':'))
+
+          print('suffix:', len(suffix))
+          print('exact:', len(exact))
+          PY
+
+      - name: Compile sing-box rule-set (.srs)
+        run: |
+          set -euo pipefail
+          SB_VERSION=$(curl -fsSL https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
+          SB_VERSION="${SB_VERSION#v}"
+          curl -fsSL -o /tmp/sb.tar.gz "https://github.com/SagerNet/sing-box/releases/download/v${SB_VERSION}/sing-box-${SB_VERSION}-linux-amd64.tar.gz"
+          tar -xzf /tmp/sb.tar.gz -C /tmp
+          /tmp/sing-box-${SB_VERSION}-linux-amd64/sing-box rule-set compile --output filter.srs /tmp/filter.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add filter.list filter.srs
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "chore: sync filter rules $(date -u +%Y-%m-%d)"
+            git push
+          fi

@@ -1,0 +1,17 @@
+||applecsb.crm.189.cn^
+||bigdata-behaviordata.189.cn^
+/misc.*\.fqnovel\.com$/
+||snssdk.com^
+||zijieapi.com^
+||byteimg.com^
+||douyinpic.com^
+||ecombdimg.com^
+||ecombdapi.com^
+||bytegecko.com^
+||ixigua.com^
+||sykjco.cn^
+||minigame.qq.com^
+||game.gtimg.cn^
+||game.gtimg.com^
+||qgcdn*.gtimg.com^
+||qqgame.qq.com^
