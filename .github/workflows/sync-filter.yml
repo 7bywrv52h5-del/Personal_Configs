@@ -26,7 +26,6 @@ jobs:
           set -euo pipefail
           curl -fsSL -o /tmp/adguard_dns.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
           curl -fsSL -o /tmp/adguard_popup.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/adguard_popup_filter.txt"
-          curl -fsSL -o /tmp/oisd_big.list "https://dl.oisd.nl/oisd_big_surge.list"
 
       - name: Merge, dedupe and generate
         run: |
@@ -86,43 +85,15 @@ jobs:
                           (suffix if suffix_match else exact).add(d)
               return suffix, exact, exc_suffix, exc_exact
 
-          def parse_surge(path):
-              suffix, exact = set(), set()
-              with open(path, encoding='utf-8', errors='ignore') as f:
-                  for raw in f:
-                      s = raw.strip()
-                      if not s or s.startswith('#') or s.startswith('//'):
-                          continue
-                      if ',' in s:
-                          typ, val = s.split(',', 1)
-                          typ = typ.strip().upper()
-                          val = clean(val)
-                          if typ == 'DOMAIN-SUFFIX':
-                              if valid_domain(val):
-                                  suffix.add(val)
-                          elif typ == 'DOMAIN':
-                              if valid_domain(val):
-                                  exact.add(val)
-                      else:
-                          # 纯域名（每行一个），按后缀匹配处理
-                          d = clean(s)
-                          if valid_domain(d):
-                              suffix.add(d)
-              return suffix, exact
-
           suffix, exact = set(), set()
           exc_suffix, exc_exact = set(), set()
 
-          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt', 'custom-rules.list']:
+          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt']:
               s, e, es, ee = parse_adblock(path)
               suffix |= s
               exact |= e
               exc_suffix |= es
               exc_exact |= ee
-
-          s, e = parse_surge('/tmp/oisd_big.list')
-          suffix |= s
-          exact |= e
 
           # 应用白名单例外
           suffix -= exc_suffix
