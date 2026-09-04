@@ -2,8 +2,8 @@ name: Sync Filter Rules
 
 on:
   schedule:
-    # 每天 UTC 05:00（北京时间 13:00）自动同步，可按需修改
-    - cron: "0 5 * * *"
+    # 每天 UTC 20:00（北京时间 04:00）自动同步，可按需修改
+    - cron: "0 20 * * *"
   workflow_dispatch:
 
 permissions:
