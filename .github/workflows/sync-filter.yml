@@ -26,6 +26,9 @@ jobs:
           set -euo pipefail
           curl -fsSL -o /tmp/adguard_dns.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
           curl -fsSL -o /tmp/adguard_popup.txt "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/adguard_popup_filter.txt"
+          curl -fsSL -o /tmp/hagezi_pro.txt "https://raw.githubusercontent.com/hagezi/dns-blocklists/refs/heads/main/adblock/pro.txt"
+          curl -fsSL -o /tmp/oisd_big.txt "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/oisd_big.txt"
+          curl -fsSL -o /tmp/hagezi_doh_vpn_proxy_bypass.txt "https://raw.githubusercontent.com/hagezi/dns-blocklists/refs/heads/main/adblock/doh-vpn-proxy-bypass.txt"
 
       - name: Merge, dedupe and generate
         run: |
@@ -88,7 +91,7 @@ jobs:
           suffix, exact = set(), set()
           exc_suffix, exc_exact = set(), set()
 
-          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt']:
+          for path in ['/tmp/adguard_dns.txt', '/tmp/adguard_popup.txt', '/tmp/hagezi_pro.txt', '/tmp/oisd_big.txt', '/tmp/hagezi_doh_vpn_proxy_bypass.txt']:
               s, e, es, ee = parse_adblock(path)
               suffix |= s
               exact |= e
